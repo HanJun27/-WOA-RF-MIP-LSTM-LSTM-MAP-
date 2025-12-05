@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+.vscode/
+.idea/
+*.egg-info/
+dist/
+build/
+
+# 数据文件
+*.pth
+*.pkl
+*.h5
+*.csv
+*.xlsx
+*.db
+*.sqlite
+
+# 日志文件
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 虚拟环境
+venv/
+ENV/
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>专业级 · 期货智能预测系统 (WOA优化版)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <style>
+        :root {
+            --metal-gradient: linear-gradient(135deg, #ffd700, #ffed4e);
+            --energy-gradient: linear-gradient(135deg, #333333, #000000);
+            --agri-gradient: linear-gradient(135deg, #56ab2f, #a8e6cf);
+            --chem-gradient: linear-gradient(135deg, #6a11cb, #2575fc);
+        }
+        
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 2rem 0; }
+        .main-container { background: rgba(255,255,255,0.97); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); }
+        .card-hover { transition: all 0.3s ease; cursor: pointer; }
+        .card-hover:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 25px 50px rgba(0,0,0,0.25) !important; }
+        .symbol-card { border: none; border-radius: 16px; overflow: hidden; position: relative; height: 100%; }
+        
+        .metal-bg { background: var(--metal-gradient); color: #000; }
+        .energy-bg { background: var(--energy-gradient); color: white; }
+        .agri-bg { background: var(--agri-gradient); color: #000; }
+        .chem-bg { background: var(--chem-gradient); color: white; }
+        
+        .price-tag { font-size: 1.4rem; font-weight: bold; }
+        .change-up { color: #dc3545; }
+        .change-down { color: #28a745; }
+        .badge-volume { font-size: 0.8rem; opacity: 0.9; }
+        .icon-3d { font-size: 2.5rem; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+        .price-chart-card { border-radius: 20px; overflow: hidden; }
+        
+        .model-badge { 
+            padding: 3px 10px; 
+            border-radius: 12px; 
+            font-size: 0.8rem; 
+            font-weight: bold;
+            color: white;
+        }
+        
+        .badge-lstm-map {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+        }
+        
+        .badge-rf-mip-lstm {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        
+        .badge-woa {
+            background: linear-gradient(135deg, #ff6b6b, #ffa500);
+        }
+        
+        .confidence-bar {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #ffc107);
+            border-radius: 3px;
+            transition: width 1s ease;
+        }
+        
+        .refresh-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: rotate(90deg);
+        }
+        
+        .realtime-badge {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .algorithm-card {
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .algorithm-card:hover {
+            border-color: #6c757d;
+        }
+        
+        .algorithm-card.active {
+            border-color: #0d6efd;
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        
+        .algorithm-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .optimization-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #ff6b6b;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .optimization-status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .status-running {
+            background-color: #d1ecf1;
+            border-left: 4px solid #0dcaf0;
+        }
+        
+        .status-completed {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        
+        .status-failed {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <div class="main-container shadow-lg">
+        <div class="bg-primary text-white p-5 text-center position-relative">
+            <div class="position-absolute top-0 end-0 m-3">
+                <span class="model-badge badge-woa">WOA智能优化</span>
+                <span class="model-badge badge-lstm-map ms-1">双算法</span>
+            </div>
+            <h1 class="mb-2"><i class="bi bi-cpu-fill me-3"></i>期货智能预测系统</h1>
+            <p class="mb-0 opacity-90">WOA优化 + LSTM-MAP + RF-MIP-LSTM · 智能超参数调优</p>
+        </div>
+
+        <div class="row g-0">
+            <!-- 左侧：热门品种卡片 -->
+            <div class="col-lg-4 bg-light p-4" style="max-height: 90vh; overflow-y: auto;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="text-primary mb-0">
+                        <i class="bi bi-fire"></i> 实时行情监控
+                    </h4>
+                    <button class="btn btn-sm btn-outline-primary" onclick="refreshAllRealtime()">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+                <div class="mb-3 text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> 点击品种获取AI预测
+                    </small>
+                </div>
+                <div class="row g-3">
+                    {% macro variety_card(name, code, icon, bg_class, category) %}
+                    <div class="col-6">
+                        <div class="symbol-card card-hover shadow {{ bg_class }} text-center p-3 position-relative" 
+                             onclick="quickPredict('{{ code }}')"
+                             data-category="{{ category }}"
+                             data-symbol="{{ code }}"
+                             oncontextmenu="showRealtimeDetail('{{ code }}'); return false;">
+                            
+                            <!-- 实时行情标识 -->
+                            <span class="realtime-badge">实时</span>
+                            
+                            <!-- 刷新按钮 -->
+                            <div class="refresh-btn" onclick="refreshSymbol('{{ code }}', event)">
+                                <i class="bi bi-arrow-clockwise text-white"></i>
+                            </div>
+                            
+                            <div class="icon-3d mb-2">{{ icon }}</div>
+                            <h6 class="mb-2">{{ name }}</h6>
+                            <code class="bg-light px-2 py-1 rounded fs-6">{{ code }}</code>
+                            
+                            {% if category == 'metal' %}
+                            <span class="badge bg-warning text-dark mt-1">贵金属</span>
+                            {% elif category == 'energy' %}
+                            <span class="badge bg-dark mt-1">能源</span>
+                            {% elif category == 'agri' %}
+                            <span class="badge bg-success mt-1">农产品</span>
+                            {% else %}
+                            <span class="badge bg-info mt-1">化工</span>
+                            {% endif %}
+
+                            <!-- 实时行情数据 -->
+                            <div class="mt-3 realtime-data" id="realtime-{{ code }}">
+                                {% if realtime_data and realtime_data[code] %}
+                                <div class="price-tag">{{ "%.2f"|format(realtime_data[code].current_price) }}</div>
+                                <div class="{% if realtime_data[code].change >= 0 %}change-up fw-bold{% else %}change-down fw-bold{% endif %} fs-6">
+                                    {% if realtime_data[code].change >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "%.2f"|format(realtime_data[code].change|abs) }} 
+                                    ({{ "%.2f"|format(realtime_data[code].change_pct) }}%)
+                                </div>
+                                <div class="badge badge-volume bg-light text-dark mt-1">
+                                    量 {{ (realtime_data[code].volume // 10000)|int if realtime_data[code].volume else 0 }}万
+                                </div>
+                                {% elif data and data.symbol == code %}
+                                <div class="price-tag">{{ "%.2f"|format(data.current_price) }}</div>
+                                <div class="{% if data.change >= 0 %}change-up fw-bold{% else %}change-down fw-bold{% endif %} fs-6">
+                                    {% if data.change >= 0 %}↑{% else %}↓{% endif %}
+                                    {{ "%.2f"|format(data.change|abs) }} 
+                                    ({{ "%.2f"|format(data.change_pct) }}%)
+                                </div>
+                                <div class="badge badge-volume bg-light text-dark mt-1">
+                                    量 {{ (data.volume // 10000)|int if data.volume else 0 }}万
+                                </div>
+                                {% else %}
+                                <div class="mt-3 opacity-75 small">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                    加载实时数据...
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            {% if data and data.symbol == code %}
+                            <div class="mt-2 text-warning small fw-bold">
+                                <i class="bi bi-lightning-charge"></i> AI预测已生成
+                            </div>
+                            {% else %}
+                            <div class="mt-2 opacity-75 small">
+                                <i class="bi bi-robot"></i> 点击进行AI预测
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endmacro %}
+
+                    {{ variety_card('黄金', 'AU0', '🪙', 'metal-bg', 'metal') }}
+                    {{ variety_card('白银', 'AG0', '🥈', 'metal-bg', 'metal') }}
+                    {{ variety_card('沪铜', 'CU0', '🛠️', 'metal-bg', 'metal') }}
+                    {{ variety_card('螺纹钢', 'RB0', '🔩', 'metal-bg', 'metal') }}
+                    {{ variety_card('原油', 'SC0', '🛢️', 'energy-bg', 'energy') }}
+                    {{ variety_card('沥青', 'BU0', '🛣️', 'energy-bg', 'energy') }}
+                    {{ variety_card('豆粕', 'M0', '🌱', 'agri-bg', 'agri') }}
+                    {{ variety_card('PTA', 'TA0', '🧪', 'chem-bg', 'chem') }}
+                    {{ variety_card('甲醇', 'MA0', '⚗️', 'chem-bg', 'chem') }}
+                    {{ variety_card('沪镍', 'NI0', '🔩', 'metal-bg', 'metal') }}
+                </div>
+                
+                <!-- 移除原左侧的WOA优化状态区域 -->
+            </div>
+
+            <!-- 右侧：主操作区 -->
+            <div class="col-lg-8 p-5">
+                {% if not data and not error %}
+                <div class="alert alert-info mb-4">
+                    <div class="d-flex">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-info-circle fs-4"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="alert-heading">WOA智能优化系统</h5>
+                            <p class="mb-1"><strong>鲸鱼优化算法(WOA)：</strong>智能搜索最佳超参数组合</p>
+                            <p class="mb-1"><strong>LSTM-MAP：</strong>专注价格时序，训练快速</p>
+                            <p class="mb-0"><strong>RF-MIP-LSTM：</strong>多特征分析，精度更高</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if error %}
+                <div class="alert alert-danger mb-4">
+                    <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+                </div>
+                {% endif %}
+
+                <!-- 算法选择区域 -->
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-gear"></i> 选择预测算法
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="algorithm-card card text-center p-3 {% if not algorithm or algorithm == 'lstm_map' %}active{% endif %}" 
+                                     onclick="selectAlgorithm('lstm_map')">
+                                    {% if optimized_params.lstm_map.has_params %}
+                                    <span class="optimization-badge">WOA优化</span>
+                                    {% endif %}
+                                    <div class="algorithm-icon text-primary">
+                                        <i class="bi bi-lightning-charge"></i>
+                                    </div>
+                                    <h5>LSTM-MAP</h5>
+                                    <p class="small text-muted mb-2">双向LSTM + 多头注意力机制</p>
+                                    <div class="d-flex justify-content-center">
+                                        <span class="badge bg-primary me-1">快速</span>
+                                        <span class="badge bg-info">专注时序</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="algorithm-card card text-center p-3 {% if algorithm == 'rf_mip_lstm' %}active{% endif %}" 
+                                     onclick="selectAlgorithm('rf_mip_lstm')">
+                                    {% if optimized_params.rf_mip_lstm.has_params %}
+                                    <span class="optimization-badge">WOA优化</span>
+                                    {% endif %}
+                                    <div class="algorithm-icon text-success">
+                                        <i class="bi bi-tree"></i>
+                                    </div>
+                                    <h5>RF-MIP-LSTM</h5>
+                                    <p class="small text-muted mb-2">随机森林特征选择 + 多输入LSTM</p>
+                                    <div class="d-flex justify-content-center">
+                                        <span class="badge bg-success me-1">高精度</span>
+                                        <span class="badge bg-warning text-dark">多特征</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- WOA优化选项 - 已移动到算法选择区域内部 -->
+                        <div class="mt-3 border-top pt-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="useOptimizedSwitch" checked>
+                                <label class="form-check-label" for="useOptimizedSwitch">
+                                    <i class="bi bi-magic text-primary"></i> 使用WOA优化参数
+                                    {% if optimized_params[algorithm or 'lstm_map'].has_params %}
+                                    <span class="badge bg-success ms-2">已优化</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark ms-2">未优化</span>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> 
+                                <span id="optimizationHint">
+                                    {% if optimized_params[algorithm or 'lstm_map'].has_params %}
+                                    使用WOA优化后的超参数，预测精度更高
+                                    {% else %}
+                                    该算法尚未优化，点击"启动优化"按钮进行智能优化
+                                    {% endif %}
+                                </span>
+                            </small>
+                        </div>
+
+                        <!-- 新增：WOA优化状态区域 -->
+                        <div class="mt-4 pt-3 border-top">
+                            <h6 class="text-primary mb-3">
+                                <i class="bi bi-gear"></i> WOA优化状态
+                            </h6>
+                            
+                            <!-- LSTM-MAP优化状态 -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small>LSTM-MAP:</small>
+                                {% if optimized_params.lstm_map.has_params %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> 已优化
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-exclamation-triangle"></i> 待优化
+                                </span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- RF-MIP-LSTM优化状态 -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small>RF-MIP-LSTM:</small>
+                                {% if optimized_params.rf_mip_lstm.has_params %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> 已优化
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-exclamation-triangle"></i> 待优化
+                                </span>
+                                {% endif %}
+                            </div>
+                            
+                            <button class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="openOptimizationPanel()">
+                                <i class="bi bi-magic"></i> 启动智能优化
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post" id="predictForm" class="mb-4">
+                    <input type="hidden" name="algorithm" id="algorithmInput" value="{{ algorithm or 'lstm_map' }}">
+                    <input type="hidden" name="use_optimized" id="useOptimizedInput" value="true">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-primary text-white">
+                                    <i class="bi bi-search"></i> 品种代码
+                                </span>
+                                <input type="text" class="form-control" name="symbol" id="symbolInput" 
+                                       placeholder="如 RB0、AU0" value="{{ symbol or '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text bg-secondary text-white">
+                                    <i class="bi bi-calendar"></i> 序列长度
+                                </span>
+                                <select class="form-select" name="seq_len" id="seqLenSelect">
+                                    <option value="30">30天</option>
+                                    <option value="40">40天</option>
+                                    <option value="50">50天</option>
+                                    <option value="60" selected>60天</option>
+                                    <option value="90">90天</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <button type="submit" class="btn btn-success btn-lg px-5" id="submitBtn">
+                            <span class="spinner-border spinner-border-sm d-none" id="loadingSpinner"></span>
+                            <span id="btnText">
+                                <i class="bi bi-robot"></i> 
+                                {% if not algorithm or algorithm == 'lstm_map' %}
+                                LSTM-MAP 预测
+                                {% else %}
+                                RF-MIP-LSTM 预测
+                                {% endif %}
+                            </span>
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-lg px-4 ms-3" onclick="getRealtimeOnly()">
+                            <i class="bi bi-eye"></i> 仅查看实时行情
+                        </button>
+                    </div>
+                </form>
+
+                {% if data %}
+                <!-- 预测结果展示区域保持不变 -->
+                <div class="price-chart-card shadow-lg mb-4">
+                    <div class="{% if algorithm == 'rf_mip_lstm' %}bg-success{% else %}bg-primary{% endif %} text-white p-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 class="mb-0">
+                                    <i class="bi bi-graph-up me-2"></i>
+                                    {{ data.symbol }} · {{ data.model_type }} 30天预测
+                                    {% if data.used_optimized_params %}
+                                    <span class="badge-woa badge ms-2">WOA优化</span>
+                                    {% endif %}
+                                </h3>
+                                <small class="opacity-75">
+                                    {% if algorithm == 'rf_mip_lstm' %}
+                                    红色虚线为RF-MIP-LSTM预测，蓝色为历史价格
+                                    {% else %}
+                                    红色虚线为LSTM-MAP预测，蓝色为历史价格
+                                    {% endif %}
+                                    {% if data.used_optimized_params %}
+                                    · 使用WOA优化参数
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <div class="model-badge {% if algorithm == 'rf_mip_lstm' %}badge-rf-mip-lstm{% else %}badge-lstm-map{% endif %}">
+                                    {{ data.model_type }}
+                                </div>
+                                {% if data.confidence %}
+                                <div class="text-white mt-1">
+                                    置信度: <strong>{{ "%.1f"|format(data.confidence * 100) }}%</strong>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <canvas id="priceChart" height="140"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 预测详情 -->
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header {% if algorithm == 'rf_mip_lstm' %}bg-success{% else %}bg-primary{% endif %} text-white">
+                                <i class="bi bi-calendar-check"></i> 近期预测结果
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>日期</th>
+                                            <th>预测价格</th>
+                                            <th>变化</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(7) %}
+                                        <tr>
+                                            <td>{{ data.future_dates[i] }}</td>
+                                            <td class="fw-bold">{{ "%.2f"|format(data.future_prices[i]) }}</td>
+                                            <td class="{% if data.future_prices[i] > data.current_price %}change-up{% else %}change-down{% endif %}">
+                                                {{ "%.2f"|format(data.future_prices[i] - data.current_price) }}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <i class="bi bi-speedometer2"></i> 模型信息
+                            </div>
+                            <div class="card-body">
+                                <p><strong>算法类型:</strong> {{ data.model_type }}</p>
+                                <p><strong>预测品种:</strong> {{ data.symbol }}</p>
+                                <p><strong>预测天数:</strong> 30天</p>
+                                <p><strong>模型置信度:</strong> {{ "%.1f"|format(data.confidence * 100) }}%</p>
+                                <p><strong>最新价格:</strong> {{ "%.2f"|format(data.current_price) }}</p>
+                                <p class="{% if data.change >= 0 %}change-up{% else %}change-down{% endif %}">
+                                    <strong>涨跌幅:</strong> 
+                                    {{ "%.2f"|format(data.change) }} ({{ "%.2f"|format(data.change_pct) }}%)</p>
+                                {% if data.used_optimized_params %}
+                                <p class="text-success">
+                                    <i class="bi bi-magic"></i> <strong>已使用WOA优化参数</strong>
+                                </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 实时详情模态框 -->
+<div class="modal fade" id="realtimeDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalTitle">实时行情详情</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <h3 id="detailSymbol">AU0</h3>
+                    <h2 class="price-tag" id="detailPrice">0.00</h2>
+                    <h4 id="detailChange" class="change-up">+0.00 (0.00%)</h4>
+                </div>
+                <table class="table table-bordered">
+                    <tr>
+                        <td>品种名称</td>
+                        <td id="detailName">-</td>
+                    </tr>
+                    <tr>
+                        <td>今开</td>
+                        <td id="detailOpen">-</td>
+                    </tr>
+                    <tr>
+                        <td>最高</td>
+                        <td id="detailHigh">-</td>
+                    </tr>
+                    <tr>
+                        <td>最低</td>
+                        <td id="detailLow">-</td>
+                    </tr>
+                    <tr>
+                        <td>昨收</td>
+                        <td id="detailPrevClose">-</td>
+                    </tr>
+                    <tr>
+                        <td>成交量</td>
+                        <td id="detailVolume">-</td>
+                    </tr>
+                    <tr>
+                        <td>持仓量</td>
+                        <td id="detailOpenInterest">-</td>
+                    </tr>
+                    <tr>
+                        <td>更新时间</td>
+                        <td id="detailTimestamp">-</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="quickPredictFromModal()">
+                    <i class="bi bi-robot"></i> AI预测此品种
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WOA优化面板模态框 -->
+<div class="modal fade" id="optimizationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-magic"></i> WOA智能优化面板
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <h6><i class="bi bi-info-circle"></i> 鲸鱼优化算法(WOA)说明</h6>
+                    <p class="small text-muted">
+                        WOA模拟座头鲸的泡网捕食策略，自动搜索LSTM/RF-MIP-LSTM的最佳超参数组合。
+                        优化过程需要3-5分钟，优化后的参数将显著提升预测精度。
+                    </p>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-lightning-charge"></i> 优化LSTM-MAP
+                            </div>
+                            <div class="card-body">
+                                <h6>优化参数:</h6>
+                                <ul class="small">
+                                    <li>隐藏层大小 (32-128)</li>
+                                    <li>LSTM层数 (1-3)</li>
+                                    <li>注意力头数 (2-8)</li>
+                                    <li>Dropout率 (0.1-0.5)</li>
+                                    <li>学习率 (0.0001-0.01)</li>
+                                </ul>
+                                <div class="mt-3">
+                                    <select class="form-select mb-2" id="lstmSymbolSelect">
+                                        <option value="AU0">黄金 (AU0)</option>
+                                        <option value="AG0">白银 (AG0)</option>
+                                        <option value="RB0">螺纹钢 (RB0)</option>
+                                        <option value="SC0">原油 (SC0)</option>
+                                    </select>
+                                    <button class="btn btn-primary w-100" onclick="startOptimization('lstm_map')">
+                                        <i class="bi bi-play-circle"></i> 启动LSTM-MAP优化
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-success text-white">
+                                <i class="bi bi-tree"></i> 优化RF-MIP-LSTM
+                            </div>
+                            <div class="card-body">
+                                <h6>优化参数:</h6>
+                                <ul class="small">
+                                    <li>隐藏层大小 (32-128)</li>
+                                    <li>LSTM层数 (1-3)</li>
+                                    <li>Dropout率 (0.1-0.5)</li>
+                                    <li>学习率 (0.0001-0.01)</li>
+                                    <li>序列长度 (30-90)</li>
+                                </ul>
+                                <div class="mt-3">
+                                    <select class="form-select mb-2" id="rfSymbolSelect">
+                                        <option value="AU0">黄金 (AU0)</option>
+                                        <option value="AG0">白银 (AG0)</option>
+                                        <option value="RB0">螺纹钢 (RB0)</option>
+                                        <option value="SC0">原油 (SC0)</option>
+                                    </select>
+                                    <button class="btn btn-success w-100" onclick="startOptimization('rf_mip_lstm')">
+                                        <i class="bi bi-play-circle"></i> 启动RF-MIP-LSTM优化
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 优化状态显示 -->
+                <div class="mt-4" id="optimizationStatusContainer" style="display: none;">
+                    <h6><i class="bi bi-hourglass-split"></i> 优化任务状态</h6>
+                    <div class="optimization-status status-running" id="optimizationStatus">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong id="statusTaskName">任务名称</strong>
+                                <div class="small" id="statusMessage">正在初始化...</div>
+                            </div>
+                            <div>
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span id="statusProgress">0%</span>
+                            </div>
+                        </div>
+                        <div class="progress mt-2" style="height: 5px;">
+                            <div id="statusProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 优化历史 -->
+                <div class="mt-4">
+                    <h6><i class="bi bi-clock-history"></i> 优化历史</h6>
+                    <div id="optimizationHistory">
+                        <!-- 动态加载优化历史 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- 脚本 -->
+<script>
+let currentAlgorithm = "{{ algorithm or 'lstm_map' }}";
+let currentTaskId = null;
+let optimizationInterval = null;
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', function() {
+    updateTime();
+    setInterval(updateTime, 60000);
+    
+    // 初始加载所有实时数据
+    refreshAllRealtime();
+    
+    // 设置定时刷新
+    setInterval(refreshAllRealtime, 300000);
+    
+    {% if data and data.seq_len %}
+    document.getElementById('seqLenSelect').value = {{ data.seq_len or 60 }};
+    {% endif %}
+    
+    // 初始化算法选择
+    updateAlgorithmUI();
+    
+    // 初始化优化选项
+    updateOptimizationUI();
+    
+    // 加载优化历史
+    loadOptimizationHistory();
+});
+
+function updateTime() {
+    const now = new Date();
+    document.getElementById('updateTime').textContent = 
+        now.toLocaleTimeString('zh-CN');
+}
+
+// 选择算法
+function selectAlgorithm(algorithm) {
+    currentAlgorithm = algorithm;
+    document.getElementById('algorithmInput').value = algorithm;
+    updateAlgorithmUI();
+    updateOptimizationUI();
+}
+
+function updateAlgorithmUI() {
+    // 更新算法卡片状态
+    document.querySelectorAll('.algorithm-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    
+    const activeCard = document.querySelector(`[onclick="selectAlgorithm('${currentAlgorithm}')"]`);
+    if (activeCard) {
+        activeCard.classList.add('active');
+    }
+    
+    // 更新按钮文本
+    const btnText = document.getElementById('btnText');
+    if (currentAlgorithm === 'rf_mip_lstm') {
+        btnText.innerHTML = '<i class="bi bi-robot"></i> RF-MIP-LSTM 预测';
+    } else {
+        btnText.innerHTML = '<i class="bi bi-robot"></i> LSTM-MAP 预测';
+    }
+}
+
+function updateOptimizationUI() {
+    // 更新优化开关状态
+    const optimizedParams = {{ optimized_params|tojson }};
+    const hasOptimized = optimizedParams[currentAlgorithm]?.has_params || false;
+    
+    document.getElementById('optimizationHint').textContent = 
+        hasOptimized 
+            ? '使用WOA优化后的超参数，预测精度更高'
+            : '该算法尚未优化，点击"启动优化"按钮进行智能优化';
+}
+
+// 打开优化面板
+function openOptimizationPanel() {
+    const modal = new bootstrap.Modal(document.getElementById('optimizationModal'));
+    modal.show();
+}
+
+// 启动优化任务
+function startOptimization(algorithm) {
+    const symbolSelect = algorithm === 'lstm_map' ? 
+        document.getElementById('lstmSymbolSelect') : 
+        document.getElementById('rfSymbolSelect');
+    
+    const symbol = symbolSelect.value;
+    
+    // 显示状态容器
+    document.getElementById('optimizationStatusContainer').style.display = 'block';
+    
+    const algorithmName = algorithm === 'lstm_map' ? 'LSTM-MAP' : 'RF-MIP-LSTM';
+    document.getElementById('statusTaskName').textContent = `${algorithmName} - ${symbol}`;
+    document.getElementById('statusMessage').textContent = '正在启动优化任务...';
+    
+    // 发送优化请求
+    fetch(`/api/optimize/${algorithm}/${symbol}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentTaskId = data.task_id;
+            document.getElementById('statusMessage').textContent = '优化任务已启动，正在运行...';
+            
+            // 开始轮询任务状态
+            startPollingTaskStatus();
+        } else {
+            document.getElementById('statusMessage').textContent = `启动失败: ${data.error}`;
+            document.getElementById('optimizationStatus').className = 'optimization-status status-failed';
+        }
+    })
+    .catch(error => {
+        document.getElementById('statusMessage').textContent = `请求失败: ${error}`;
+        document.getElementById('optimizationStatus').className = 'optimization-status status-failed';
+    });
+}
+
+// 开始轮询任务状态
+function startPollingTaskStatus() {
+    if (optimizationInterval) {
+        clearInterval(optimizationInterval);
+    }
+    
+    optimizationInterval = setInterval(() => {
+        fetch(`/api/optimization_status/${currentTaskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const status = data.status;
+                    const progress = data.progress || 0;
+                    
+                    // 更新进度
+                    document.getElementById('statusProgress').textContent = `${progress}%`;
+                    document.getElementById('statusProgressBar').style.width = `${progress}%`;
+                    
+                    if (status === 'running') {
+                        document.getElementById('optimizationStatus').className = 'optimization-status status-running';
+                        document.getElementById('statusMessage').textContent = 
+                            `正在优化中... (迭代 ${Math.floor(progress/5)}/20)`;
+                    } 
+                    else if (status === 'completed') {
+                        document.getElementById('optimizationStatus').className = 'optimization-status status-completed';
+                        document.getElementById('statusMessage').textContent = 
+                            `优化完成! 耗时 ${data.duration ? data.duration.toFixed(1) : '?'} 秒`;
+                        document.getElementById('statusProgress').textContent = '100%';
+                        document.getElementById('statusProgressBar').style.width = '100%';
+                        
+                        // 停止轮询
+                        clearInterval(optimizationInterval);
+                        
+                        // 重新加载页面以显示更新状态
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    }
+                    else if (status === 'failed') {
+                        document.getElementById('optimizationStatus').className = 'optimization-status status-failed';
+                        document.getElementById('statusMessage').textContent = 
+                            `优化失败: ${data.error || '未知错误'}`;
+                        
+                        // 停止轮询
+                        clearInterval(optimizationInterval);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('轮询任务状态失败:', error);
+            });
+    }, 2000); // 每2秒轮询一次
+}
+
+// 加载优化历史
+function loadOptimizationHistory() {
+    // 这里可以添加加载优化历史的逻辑
+    // 现在只是显示示例
+    const historyContainer = document.getElementById('optimizationHistory');
+    historyContainer.innerHTML = `
+        <div class="small text-muted">
+            <i class="bi bi-info-circle"></i> 优化历史将在优化完成后显示
+        </div>
+    `;
+}
+
+// 刷新单个品种的实时数据
+function refreshSymbol(symbol, event) {
+    if (event) event.stopPropagation();
+    
+    const element = document.getElementById(`realtime-${symbol}`);
+    if (!element) return;
+    
+    element.innerHTML = `
+        <div class="text-center py-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <div class="mt-1 small">刷新中...</div>
+        </div>
+    `;
+    
+    fetch(`/api/realtime/${symbol}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const changeClass = data.change >= 0 ? 'change-up' : 'change-down';
+                const changeIcon = data.change >= 0 ? '↑' : '↓';
+                const volume = data.volume ? Math.floor(data.volume / 10000) : 0;
+                
+                element.innerHTML = `
+                    <div class="price-tag">${data.current_price.toFixed(2)}</div>
+                    <div class="${changeClass} fw-bold fs-6">
+                        ${changeIcon}${Math.abs(data.change).toFixed(2)} 
+                        (${data.change_pct.toFixed(2)}%)
+                    </div>
+                    <div class="badge badge-volume bg-light text-dark mt-1">
+                        量 ${volume}万
+                    </div>
+                `;
+            } else {
+                element.innerHTML = `
+                    <div class="text-danger small">
+                        <i class="bi bi-exclamation-triangle"></i> 刷新失败
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            element.innerHTML = `
+                <div class="text-danger small">
+                    <i class="bi bi-exclamation-triangle"></i> 网络错误
+                </div>
+            `;
+        });
+}
+
+// 刷新所有品种的实时数据
+function refreshAllRealtime() {
+    console.log('刷新所有实时数据...');
+    const symbols = ['AU0', 'AG0', 'CU0', 'RB0', 'SC0', 'BU0', 'M0', 'TA0', 'MA0', 'NI0'];
+    
+    symbols.forEach(symbol => {
+        refreshSymbol(symbol);
+    });
+    
+    updateTime();
+}
+
+// 显示实时详情模态框
+function showRealtimeDetail(symbol) {
+    const modal = new bootstrap.Modal(document.getElementById('realtimeDetailModal'));
+    const config = {{ futures_config|tojson }};
+    
+    document.getElementById('detailSymbol').textContent = symbol;
+    document.getElementById('modalTitle').textContent = `${config[symbol]?.name || symbol} 实时行情`;
+    document.getElementById('detailName').textContent = config[symbol]?.name || '-';
+    
+    fetch(`/api/realtime/${symbol}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('detailPrice').textContent = data.current_price.toFixed(2);
+                
+                const changeElement = document.getElementById('detailChange');
+                changeElement.textContent = `${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)} (${data.change_pct.toFixed(2)}%)`;
+                changeElement.className = data.change >= 0 ? 'change-up' : 'change-down';
+            } else {
+                document.getElementById('detailPrice').textContent = '0.00';
+                document.getElementById('detailChange').textContent = '数据获取失败';
+            }
+        });
+    
+    modal.show();
+}
+
+// 从模态框进行预测
+function quickPredictFromModal() {
+    const symbol = document.getElementById('detailSymbol').textContent;
+    quickPredict(symbol);
+    bootstrap.Modal.getInstance(document.getElementById('realtimeDetailModal')).hide();
+}
+
+// 仅查看实时行情（不进行预测）
+function getRealtimeOnly() {
+    const symbol = document.getElementById('symbolInput').value.trim().toUpperCase();
+    if (!symbol) {
+        alert('请输入品种代码');
+        return;
+    }
+    
+    showRealtimeDetail(symbol);
+}
+
+function quickPredict(code) {
+    document.getElementById('symbolInput').value = code;
+    
+    // 根据品种类别设置默认序列长度
+    const card = document.querySelector(`[data-symbol="${code}"]`);
+    if (card && card.dataset.category) {
+        const category = card.dataset.category;
+        const seqLenMap = {
+            'metal': '60',
+            'energy': '40',
+            'agri': '50',
+            'chem': '40'
+        };
+        document.getElementById('seqLenSelect').value = seqLenMap[category] || '60';
+    }
+    
+    // 获取优化选项
+    const useOptimized = document.getElementById('useOptimizedSwitch').checked;
+    document.getElementById('useOptimizedInput').value = useOptimized;
+    
+    // 提交表单
+    document.getElementById('loadingSpinner').classList.remove('d-none');
+    const btnText = document.getElementById('btnText');
+    btnText.innerHTML = currentAlgorithm === 'rf_mip_lstm' 
+        ? `<i class="bi bi-robot"></i> ${useOptimized ? 'WOA优化 ' : ''}RF-MIP-LSTM预测 ${code}...`
+        : `<i class="bi bi-robot"></i> ${useOptimized ? 'WOA优化 ' : ''}LSTM-MAP预测 ${code}...`;
+    
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('predictForm').submit();
+}
+
+document.getElementById('predictForm').addEventListener('submit', function() {
+    if (!document.getElementById('loadingSpinner').classList.contains('d-none')) return;
+    document.getElementById('loadingSpinner').classList.remove('d-none');
+    
+    const useOptimized = document.getElementById('useOptimizedSwitch').checked;
+    const btnText = document.getElementById('btnText');
+    btnText.innerHTML = currentAlgorithm === 'rf_mip_lstm'
+        ? `<i class="bi bi-robot"></i> ${useOptimized ? 'WOA优化 ' : ''}RF-MIP-LSTM 分析中...`
+        : `<i class="bi bi-robot"></i> ${useOptimized ? 'WOA优化 ' : ''}LSTM-MAP 分析中...`;
+    
+    document.getElementById('submitBtn').disabled = true;
+});
+</script>
+
+{% if data %}
+<script>
+const ctx = document.getElementById('priceChart').getContext('2d');
+
+const futurePrices = {{ data.future_prices|tojson }};
+const histPrices = {{ data.hist_prices|tojson }};
+const histDates = {{ data.hist_dates|tojson }};
+const futureDates = {{ data.future_dates|tojson }};
+
+// 图表配置
+const chartConfig = {
+    type: 'line',
+    data: {
+        labels: [...histDates, ...futureDates],
+        datasets: [
+            {
+                label: '历史价格',
+                data: [...histPrices, ...Array(futurePrices.length).fill(null)],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 2
+            },
+            {
+                label: '{{ data.model_type }} 预测',
+                data: [...Array(histPrices.length).fill(null), ...futurePrices],
+                borderColor: '#dc3545',
+                borderWidth: 4,
+                borderDash: [8, 4],
+                pointRadius: 3,
+                tension: 0.2
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    font: { size: 14 },
+                    usePointStyle: true
+                }
+            },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            label += context.parsed.y.toFixed(2);
+                        }
+                        return label;
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: false,
+                grid: {
+                    color: 'rgba(0,0,0,0.05)'
+                },
+                title: {
+                    display: true,
+                    text: '价格'
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                },
+                ticks: {
+                    maxTicksLimit: 15
+                }
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'nearest'
+        },
+        animation: {
+            duration: 2000
+        }
+    }
+};
+
+new Chart(ctx, chartConfig);
+</script>
+{% endif %}
+</body>
+</html>
+[file content end]
