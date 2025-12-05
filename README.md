@@ -254,9 +254,9 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ## 📞 联系与支持
 
 如有问题或建议，请通过以下方式联系：
-- 📧 邮箱：[你的邮箱]
-- 🐛 GitHub Issues：[项目Issues页面]
-- 💬 技术讨论：[技术论坛/群组]
+- 📧 邮箱：xs2730098037@gamil.com
+- 🐛 GitHub Issues：
+- 💬 技术讨论：
 
 ---
 
